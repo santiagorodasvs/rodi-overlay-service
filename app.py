@@ -25,12 +25,37 @@ SPACE_WIDTH_RATIO = 0.30
 MAX_CHARS = 50
 EXMOUTH_OVERLAP = 60
 
+TARGET_W, TARGET_H = 1024, 1365  # 3:4 ("4:3") post ratio - all posts/carousel images are cropped to this
+
+
+def fit_to_target(img, target_w=TARGET_W, target_h=TARGET_H):
+    # Center-crop (after a cover-resize) so every image lands on the same 4:3 canvas,
+    # regardless of what size the AI generator actually returned (1024x1024, 1024x1536, etc).
+    src_w, src_h = img.size
+    target_ratio = target_w / target_h
+    src_ratio = src_w / src_h
+
+    if src_ratio > target_ratio:
+        # source is relatively wider - scale to match height, crop sides
+        new_h = target_h
+        new_w = int(src_w * (target_h / src_h))
+    else:
+        # source is relatively taller - scale to match width, crop top/bottom
+        new_w = target_w
+        new_h = int(src_h * (target_w / src_w))
+
+    resized = img.resize((new_w, new_h), Image.LANCZOS)
+    left = (new_w - target_w) // 2
+    top = (new_h - target_h) // 2
+    return resized.crop((left, top, left + target_w, top + target_h))
+
 
 def compose(bg_img, quote_text):
     quote_text = quote_text.strip()
     if len(quote_text) > MAX_CHARS:
         quote_text = quote_text[:MAX_CHARS].rsplit(" ", 1)[0]
 
+    bg_img = fit_to_target(bg_img)
     canvas_w, canvas_h = bg_img.size
     bg = bg_img.convert("RGBA")
     draw = ImageDraw.Draw(bg)
@@ -111,6 +136,7 @@ def compose(bg_img, quote_text):
 
 
 def add_watermark_only(bg_img):
+    bg_img = fit_to_target(bg_img)
     canvas_w, canvas_h = bg_img.size
     bg = bg_img.convert("RGBA")
     draw = ImageDraw.Draw(bg)
